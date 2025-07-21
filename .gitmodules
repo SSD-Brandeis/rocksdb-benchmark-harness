@@ -1,0 +1,4 @@
+[submodule "vendor/rocksdb"]
+	path = vendor/rocksdb
+	url = git@github.com:SSD-Brandeis/RocksDB-SSD.git
+  branch = LSMMemoryProfiling
