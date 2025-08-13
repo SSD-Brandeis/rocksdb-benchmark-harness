@@ -3,7 +3,7 @@
 set -e
 
 echo "Installing system dependencies"
-sudo apt-get update && sudo apt-get upgrade
+sudo apt-get update -y && sudo apt-get upgrade
 sudo apt-get install git curl build-essential cmake sysstat libgflags-dev -y
 
 echo "Installing rust"
