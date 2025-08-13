@@ -2,3 +2,9 @@
 	path = vendor/rocksdb
 	url = git@github.com:SSD-Brandeis/RocksDB-SSD.git
   branch = LSMMemoryProfiling
+[submodule "vendor/tectonic"]
+	path = vendor/tectonic
+	url = https://github.com/SSD-Brandeis/tectonic
+[submodule "vendor/YCSB"]
+	path = vendor/YCSB
+	url = git@github.com:AlexanderHott/YCSB.git

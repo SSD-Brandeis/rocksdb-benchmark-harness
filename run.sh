@@ -12,5 +12,4 @@ elif [ "$build_type" = "release" ]; then
   cmake --build cmake-build-release --target rocksdb-benchmark-harness -- -j"$(nproc)" && ./cmake-build-release/rocksdb-benchmark-harness
 else
   echo "./run.sh debug|release"
-
 fi

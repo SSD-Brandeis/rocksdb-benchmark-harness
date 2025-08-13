@@ -1,0 +1,49 @@
+{
+  "$schema": "../../vendor/tectonic/workload_schema.json",
+  "sections": [
+    {
+      "groups": [
+        {
+          "inserts": {
+            "amount": 1000000,
+            "key": {
+              "segmented": {
+                "segments": [
+                  "usertable:user",
+                  { "uniform": { "len": 19, "character_set": "numeric" } }
+                ],
+                "separator": ""
+              }
+            },
+            "val": {
+              "uniform": { "len": 1024 }
+            }
+          }
+        },
+        {
+          "point_queries": {
+            "amount": 500000,
+            "selection": {
+              "beta": {
+                "alpha": 0.1,
+                "beta": 5
+              }
+            }
+          },
+          "updates": {
+            "amount": 500000,
+            "val": {
+              "uniform": { "len": 128 }
+            },
+            "selection": {
+              "beta": {
+                "alpha": 0.2,
+                "beta": 5.0
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
