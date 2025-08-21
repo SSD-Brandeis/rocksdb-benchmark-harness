@@ -8,6 +8,11 @@
 #include <fmt/base.h>
 #include <nlohmann/json.hpp>
 
+#include "iostats_context.h"
+#include "perf_context.h"
+#include "statistics.h"
+#include "../cmake-build-debug/_deps/fmt-src/include/fmt/xchar.h"
+
 using json = nlohmann::json;
 using hrc = std::chrono::high_resolution_clock;
 using ns = std::chrono::nanoseconds;
@@ -29,7 +34,8 @@ std::tuple<rocksdb::Status, rocksdb::Options, rocksdb::ReadOptions, rocksdb::Wri
     return {s, rocksdb::Options(), rocksdb::ReadOptions(), rocksdb::WriteOptions()};
   }
 
-  const rocksdb::Options options(db_opts, cf_descs[0].options);
+  rocksdb::Options options(db_opts, cf_descs[0].options);
+  options.statistics = rocksdb::CreateDBStatistics();
 
   rocksdb::ReadOptions read_options;
   rocksdb::WriteOptions write_options;
@@ -89,6 +95,10 @@ namespace stats {
 [[nodiscard]] rocksdb::Status benchmark(
   const std::string &rocksdb_options_filename,
   const std::string &workload_filename,
+#ifdef STATS
+  const std::string &stats_filename,
+  const std::string &latency_filename,
+#endif
   const std::string &db_name = "./db"
 ) {
   std::ifstream workload_file(workload_filename);
@@ -96,6 +106,10 @@ namespace stats {
   if (!workload_file.is_open()) {
     FAIL("Error: Could not open workload file", rocksdb::Status::PathNotFound());
   }
+#ifdef STATS
+  std::ofstream stats_file(stats_filename);
+  std::ofstream latency_file(latency_filename);
+#endif // STATS
 
   std::unique_ptr<rocksdb::DB> db;
 
@@ -107,7 +121,7 @@ namespace stats {
   if (!s.ok())
     FAIL("couldn't open db", s);
 
-#ifdef TIMER
+#ifdef STATS
   std::vector<stats::OperationTiming> timings;
 #endif
   std::string line;
@@ -121,41 +135,61 @@ namespace stats {
       const size_t pos2 = rest.find(' ');
       const std::string key = rest.substr(0, pos2);
       const std::string value = rest.substr(pos2 + space_len);
-#ifdef TIMER
+#ifdef STATS
       auto start = hrc::now();
 #endif
       s = db->Put(write_opts, key, value);
-#ifdef TIMER
+#ifdef STATS
       auto latency = std::chrono::duration_cast<ns>(hrc::now() - start);
       timings.emplace_back(stats::Insert, latency.count());
 #endif
       if (!s.ok()) fmt::println(stderr, "Error inserting {}", s.ToString());
     } else if (operation == "P") {
       std::string value;
+#ifdef STATS
+      auto start = hrc::now();
+#endif
       s = db->Get(read_opts, rest, &value);
+#ifdef STATS
+      auto latency = std::chrono::duration_cast<ns>(hrc::now() - start);
+      timings.emplace_back(stats::PointQuery, latency.count());
+#endif
       if (!s.ok() && !s.IsNotFound()) fmt::println(stderr, "Error point querying {}", s.ToString());
     } else if (operation == "U") {
       const size_t pos2 = rest.find(' ');
       const std::string key = rest.substr(0, pos2);
       const std::string value = rest.substr(pos2 + space_len);
-      s = db->Put(write_opts, rest, value);
-      if (!s.ok()) { fmt::println(stderr, "Error updating {}", s.ToString());
-}
+#ifdef STATS
+      auto start = hrc::now();
+#endif
+      s = db->Put(write_opts, key, value);
+#ifdef STATS
+      auto latency = std::chrono::duration_cast<ns>(hrc::now() - start);
+      timings.emplace_back(stats::Update, latency.count());
+#endif
+      if (!s.ok()) {
+        fmt::println(stderr, "Error updating {}", s.ToString());
+      }
     } else {
       fmt::println(stderr, "Unknown operation in workload file: {}", operation);
     }
   }
+#ifdef STATS
+  stats_file << fmt::format("[rocksdb::get_perf_context]\n{}\n", rocksdb::get_perf_context()->ToString());
+  stats_file << fmt::format("[rocksdb::get_iostats_context]\n{}\n", rocksdb::get_iostats_context()->ToString());
+  stats_file << fmt::format("[options.statistics]\n{}\n", opts.statistics->ToString());
+#endif // STATS
 
   s = db->Close();
   if (!s.ok())
     FAIL("couldn't close db", s);
 
   s = rocksdb::DestroyDB(db_name, opts);
-  if (!s.ok()) FAIL("couldn't destroy db", s);
-#ifdef TIMER
+  if (!s.ok())
+    FAIL("couldn't destroy db", s);
+#ifdef STATS
   json timings_json = timings;
-  fmt::print("{}", timings_json.dump());
-  // timings
+  latency_file << timings_json.dump();
 #endif
 
   return rocksdb::Status::OK();
@@ -170,7 +204,20 @@ int main(const int argc, char *argv[]) {
   const std::string rocksdb_options_filename = argv[1];
   const std::string workload_filename = argv[2];
 
-  rocksdb::Status s = benchmark(rocksdb_options_filename, workload_filename);
+#ifdef STATS
+  const std::string stats_filename = argv[3];
+  const std::string latency_filename = argv[4];
+#endif // STATS
+
+  rocksdb::Status s = benchmark(
+    rocksdb_options_filename,
+    workload_filename
+#ifdef STATS
+    ,
+    stats_filename,
+    latency_filename
+#endif // STATS
+  );
   if (!s.ok())
     FAIL("error running benchmark", s);
 

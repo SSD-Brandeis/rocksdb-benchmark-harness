@@ -1,8 +1,6 @@
 import numpy as np
-from scipy.stats import beta as beta_dist
-from scipy.optimize import minimize
 from collections import Counter
-from scipy.stats import beta
+from scipy import stats
 
 def count_workload(filename: str) -> tuple[Counter, ...]:
     with open(filename) as f:
@@ -29,21 +27,18 @@ def count_workload(filename: str) -> tuple[Counter, ...]:
 
 
 if __name__ == "__main__":
-    N = 10
-
     ycsb_op, ycsb_i, ycsb_u, ycsb_pq = count_workload("../experiments/workload-similarity/ycsb-workload-a.txt")
 
-    # alpha_true, beta_true = 2.5, 5.0
-    # indices = generate_indices(alpha_true, beta_true, N, num_samples=50, seed=42)
-    counts = [count for _, count in ycsb_u.most_common()]
-    n = len(counts)
+    print(ycsb_u)
 
-    midpoints = (np.arange(n) + 0.5) / n
-    print(midpoints)
-    samples = np.repeat(midpoints, counts)
-    print(samples)
-    a_hat, b_hat, loc, scale = beta.fit(samples, floc=0, fscale=1)
-    print(a_hat, b_hat, loc, scale)
+
+
+
+    # print(samples)
+    #
+    # sampled = [nums[int(i)] for i in samples]
+    #
+    # print(sampled)
 
 
 

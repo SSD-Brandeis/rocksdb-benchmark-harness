@@ -11,3 +11,8 @@ mkdir -p cmake-build-release
 cd cmake-build-release
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cd ..
+
+mkdir -p cmake-build-release-with-stats
+cd cmake-build-release-with-stats
+cmake .. -DCMAKE_BUILD_TYPE=Release -DSTATS="on"
+cd ..

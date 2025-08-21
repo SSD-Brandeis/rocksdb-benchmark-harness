@@ -12,6 +12,7 @@ cd ../..
 
 echo "Building rocksdb-benchmark-harness"
 cmake --build cmake-build-release --target rocksdb-benchmark-harness -- -j"$(nproc)"
+cmake --build cmake-build-release-with-stats --target rocksdb-benchmark-harness -- -j"$(nproc)"
 
 function generate_tectonic_workload() {
   echo "generating tectonic workload"
@@ -46,34 +47,59 @@ function generate_ycsb_workload() {
   cd ../..
 }
 
- ./cmake-build-release/rocksdb-benchmark-harness \
+./cmake-build-release/rocksdb-benchmark-harness \
+ ./experiments/workload-similarity/rocksdb-options.ini \
+ ./experiments/workload-similarity/tec-workload-a.txt >"${EXPERIMENT_PATH}/ops.json"
+
+for i in $(seq 1 "$RUNS"); do
+  echo "tectonic iostat run $i"
+  generate_tectonic_workload
+  generate_ycsb_workload
+
+  iostat -d -c -y 1 nvme0n1 -o JSON >"./experiments/workload-similarity/iostat.tectonic.$i.json" &
+  IOSTAT_PID=$!
+  sudo sysctl -w vm.drop_caches=3
+
+  ./cmake-build-release/rocksdb-benchmark-harness \
    ./experiments/workload-similarity/rocksdb-options.ini \
-   ./experiments/workload-similarity/tec-workload-a.txt >"${EXPERIMENT_PATH}/ops.json"
+   ./experiments/workload-similarity/tec-workload-a.txt
 
- for i in $(seq 1 "$RUNS"); do
-   echo "tectonic iostat run $i"
-   generate_tectonic_workload
-   generate_ycsb_workload
+  kill -INT $IOSTAT_PID
 
-   iostat -d 1 nvme0n1 -o JSON >"./experiments/workload-similarity/iostat.tectonic.$i.json" &
-   IOSTAT_PID=$!
-   sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
+  echo "YCSB iostat run $i"
+  iostat -d -c -y 1 nvme0n1 -o JSON >"./experiments/workload-similarity/iostat.ycsb.$i.json" &
+  IOSTAT_PID=$!
+  sudo sysctl -w vm.drop_caches=3
 
-   ./cmake-build-release/rocksdb-benchmark-harness \
-     ./experiments/workload-similarity/rocksdb-options.ini \
-     ./experiments/workload-similarity/tec-workload-a.txt
+  ./cmake-build-release/rocksdb-benchmark-harness \
+   ./experiments/workload-similarity/rocksdb-options.ini \
+   ./experiments/workload-similarity/ycsb-workload-a.txt
 
-   kill -INT $IOSTAT_PID
+  kill -INT $IOSTAT_PID
+done
 
-   echo "YCSB iostat run $i"
-   iostat -d 1 nvme0n1 -o JSON >"./experiments/workload-similarity/iostat.ycsb.$i.json" &
-   IOSTAT_PID=$!
-   sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
+for i in $(seq 1 "$RUNS"); do
+  echo "generating workloads for run $i"
+  generate_tectonic_workload
+  generate_ycsb_workload
 
-   ./cmake-build-release/rocksdb-benchmark-harness \
-     ./experiments/workload-similarity/rocksdb-options.ini \
-     ./experiments/workload-similarity/ycsb-workload-a.txt
+  echo "tectonic stats run $i"
+  sudo sysctl -w vm.drop_caches=3
 
-   kill -INT $IOSTAT_PID
+  ./cmake-build-release-with-stats/rocksdb-benchmark-harness \
+   ./experiments/workload-similarity/rocksdb-options.ini \
+   ./experiments/workload-similarity/tec-workload-a.txt \
+   "./experiments/workload-similarity/stats.tectonic.$i.json" \
+   "./experiments/workload-similarity/op-latency.tectonic.$i.json"
 
- done
+
+  echo "YCSB stats run $i"
+  sudo sysctl -w vm.drop_caches=3
+
+  ./cmake-build-release-with-stats/rocksdb-benchmark-harness \
+   ./experiments/workload-similarity/rocksdb-options.ini \
+   ./experiments/workload-similarity/ycsb-workload-a.txt \
+   "./experiments/workload-similarity/stats.ycsb.$i.json" \
+   "./experiments/workload-similarity/op-latency.ycsb.$i.json"
+
+done
