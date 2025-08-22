@@ -1,166 +1,117 @@
-from collections import defaultdict
-import json
-import typing as t
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from glob import glob
-from collections import Counter
+import matplotlib.font_manager as font_manager
+import os
+import json
 import numpy as np
-import statsmodels.api as sm
-from statsmodels.genmod import families
-from statsmodels.genmod.families.links import logit
-from statsmodels.genmod.generalized_linear_model import GLM
+from glob import glob
+from matplotlib.ticker import MaxNLocator
 
-from statsmodels.othermod.betareg import BetaModel
+from style import line_styles
+
+prop = font_manager.FontProperties(
+    fname="/Users/cba/Desktop/tectonic/LinLibertine_Mah.ttf"
+)
+plt.rcParams['font.family'] = prop.get_name()
+plt.rcParams['text.usetex'] = True
+plt.rcParams['font.weight'] = 'normal'
+plt.rcParams['font.size'] = 22
+
+BASE = "/Users/cba/Desktop/rocksdb-benchmark-harness/experiments/workload-similarity"
+BYTE_TO_MB = 1024.0 * 1024.0  # bytes → MB (MiB)
+
+def load_iostat_series(path):
+    with open(path) as f:
+        raw = json.load(f)
+    stats = raw["sysstat"]["hosts"][0]["statistics"]
+    reads_b, writes_b = [], []
+    for st in stats:
+        d0 = st.get("disk", [{}])[0]
+    
+        reads_b.append(float(d0.get("kB_read/s", 0.0)))
+        writes_b.append(float(d0.get("kB_wrtn/s", 0.0)))
+
+    reads_mb = np.array(reads_b, dtype=float) / BYTE_TO_MB
+    writes_mb = np.array(writes_b, dtype=float) / BYTE_TO_MB
+    return reads_mb, writes_mb
+
+def collect_runs(system):
+    paths = sorted(glob(os.path.join(BASE, f"iostat.{system}.*.json")))
+    runs = []
+    for p in paths:
+        r_mb, w_mb = load_iostat_series(p)
+        runs.append((r_mb, w_mb))
+    return runs
+
+def average_runs(runs):
+    if not runs:
+        return np.array([]), np.array([])
+    L = min(len(r) for (r, _) in runs)
+    R = np.stack([r[:L] for (r, _) in runs]).mean(axis=0)
+    W = np.stack([w[:L] for (_, w) in runs]).mean(axis=0)
+    return R, W
 
 def main():
-    workload_similarity_iostat()
-    # workload_similarity_op_latency()
-    # workload_similarity_counting()
+    runs_tec = collect_runs("tectonic")
+    runs_ycsb = collect_runs("ycsb")
+    if not runs_tec or not runs_ycsb:
+        raise RuntimeError("Missing iostat runs for one or both systems.")
+    r_tec_avg, w_tec_avg = average_runs(runs_tec)
+    r_ycsb_avg, w_ycsb_avg = average_runs(runs_ycsb)
+    n = min(len(r_tec_avg), len(w_tec_avg), len(r_ycsb_avg), len(w_ycsb_avg))
+    if n == 0:
+        raise RuntimeError("No overlapping length after averaging.")
+    x = np.arange(n)
+
+    fig, ax = plt.subplots(figsize=(10, 6), dpi=150)
 
 
-def workload_similarity_op_latency():
-    def load_data(path: str):
-        with open(path) as f:
-            data_raw = json.load(f)
+    for r, w in runs_ycsb:
+        m = min(len(r), n)
+        ax.plot(np.arange(m), r[:m], color=line_styles["YCSB"]["color"], alpha=0.18, linewidth=1.0)
+        ax.plot(np.arange(m), w[:m], color=line_styles["YCSB"]["color"], alpha=0.18, linewidth=1.0, linestyle="--")
+    for r, w in runs_tec:
+        m = min(len(r), n)
+        ax.plot(np.arange(m), r[:m], color=line_styles["Tectonic"]["color"], alpha=0.18, linewidth=1.0)
+        ax.plot(np.arange(m), w[:m], color=line_styles["Tectonic"]["color"], alpha=0.18, linewidth=1.0, linestyle="--")
 
-        return [d["latency"] for d in data_raw]
+    # averaged lines
+    ycsb_read_style  = {**line_styles["YCSB"]}
+    ycsb_write_style = {**line_styles["YCSB"], "linestyle": "--"}
+    tec_read_style   = {**line_styles["Tectonic"]}
+    tec_write_style  = {**line_styles["Tectonic"], "linestyle": "--"}
 
-    data = load_data("../experiments/workload-similarity/ops.json")
-    plt.figure(figsize=(10, 6), dpi=150)
-    plt.plot(list(range(len(data))), data, label="latency")
-    plt.yscale("log")
-    plt.savefig("../workload-similarity-op-latency.png")
+    l1, = ax.plot(x, r_ycsb_avg[:n], **ycsb_read_style)
+    l2, = ax.plot(x, w_ycsb_avg[:n], **ycsb_write_style)
+    l3, = ax.plot(x, r_tec_avg[:n],  **tec_read_style)
+    l4, = ax.plot(x, w_tec_avg[:n],  **tec_write_style)
 
+    ax.set_xlabel("time (s)")
+    ax.set_ylabel("MB/s")
 
-def workload_similarity_iostat():
-    def load_data(path: str):
-        with open(path) as f:
-            iostat_data_raw = json.load(f)
+    ymax = float(
+        max(
+            r_ycsb_avg[:n].max(),
+            w_ycsb_avg[:n].max(),
+            r_tec_avg[:n].max(),
+            w_tec_avg[:n].max(),
+        )
+    )
+    ax.set_ylim(0, ymax * 1.15)
 
-        iostat_data = []
-        for stat in iostat_data_raw["sysstat"]["hosts"][0]["statistics"]:
-            dat: dict[str, t.Any] = stat["disk"][0]
-            # iostat_data.append({"kB_read": dat["kB_read"], "kB_wrtn": dat["kB_wrtn"]})
-            iostat_data.append({"kB_read": dat["kB_read/s"], "kB_wrtn": dat["kB_wrtn/s"]})
-        return iostat_data
+    # enforce integer ticks on x-axis
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 
+    labels = ["YCSB (read)", "YCSB (write)", "Tectonic (read)", "Tectonic (write)"]
+    ax.legend([l1, l2, l3, l4], labels, frameon=False, ncol=2,
+              loc='upper center', bbox_to_anchor=(0.5, -0.22))
+    fig.subplots_adjust(bottom=0.28)
 
-    datas_tec = [
-        load_data(path)
-        for path in glob("../experiments/workload-similarity/iostat.tectonic.*.json")
-    ]
-    datas_ycsb = [
-        load_data(path)
-        for path in glob("../experiments/workload-similarity/iostat.ycsb.*.json")
-    ]
-
-
-    def plot_datas(datas, name: str):
-        plt.figure(figsize=(10, 6), dpi=150)
-        for i, iostat_data in enumerate(datas):
-            keys = iostat_data[0].keys()
-            x = list(range(len(iostat_data)))
-
-            for key in keys:
-                y = [d[key] for d in iostat_data]
-                plt.plot(x, y, label=f"{key}-{i}", alpha=0.25)
-
-        max_len = max(len(iostat_data) for iostat_data in datas)
-        avgs = []
-        for i in range(max_len):
-            cols = [data[i] for data in datas if i < len(data)]
-            keys = cols[0].keys()
-            data_avg = defaultdict(float)
-            for col in cols:
-                for key in keys:
-                    data_avg[key] += col[key]
-
-            for key in keys:
-                data_avg[key] /= len(cols)
-
-            avgs.append(data_avg)
-
-        for key in avgs[0].keys():
-            x = list(range(max_len))
-            y = [d[key] for d in avgs]
-            plt.plot(x, y, label=f"{key}-avg")
-
-        # plt.yscale("log")
-        plt.legend()
-        plt.ylim(top=800_000)
-        plt.savefig(f"../iostat.{name}-ps.png")
-
-    plot_datas(datas_tec, "tectonic")
-    plot_datas(datas_ycsb, "ycsb")
-
-def workload_similarity_counting():
-    def count_workload(filename: str) -> tuple[Counter, ...]:
-        with open(filename) as f:
-            counter_op = Counter()
-            counter_i = Counter()
-            counter_u = Counter()
-            counter_pq = Counter()
-            for line in f.readlines():
-                parts = line.strip().split(" ")
-                op = parts[0]
-                key = parts[1]
-
-                counter_op[op] += 1
-
-                if op == "I":
-                    counter_i[key] += 1
-                elif op == "U":
-                    counter_u[key] += 1
-                elif op == "P":
-                    counter_pq[key] += 1
-
-
-        return counter_op, counter_i, counter_u, counter_pq
-
-    tec_op, tec_i, tec_u, tec_pq = count_workload("../experiments/workload-similarity/tec-workload-a.txt")
-    ycsb_op, ycsb_i, ycsb_u, ycsb_pq = count_workload("../experiments/workload-similarity/ycsb-workload-a.txt")
-    print("tec", tec_op)
-    print("ycsb", ycsb_op)
-
-    print(f"{tec_u.total()=} {len(set(tec_u.keys()))=}")
-    # for x in tec_u.most_common(100):
-    #     print(x)
-
-    print(f"{ycsb_u.total()=} {len(set(ycsb_u.keys()))=}")
-
-    POINTS = 100
-    tec_u_counts = [count for _, count in tec_u.most_common(POINTS)]
-    tec_u_counts = np.array(tec_u_counts)
-    ycsb_u_counts = [count for _, count in ycsb_u.most_common(POINTS)]
-    ycsb_u_counts = np.array(ycsb_u_counts)
-
-    data = {
-        "tec": tec_u_counts,
-        "ycsb": ycsb_u_counts,
-    }
-    bottom = np.zeros(POINTS)
-    for label, counts in data.items():
-        plt.bar(list(range(POINTS)), counts, label=label, bottom=bottom)
-        bottom += counts
-    plt.legend()
-    plt.savefig("../workload-similarity-count.png")
-
-
-
-    # def plot_bar(keys: Counter):
-    #     # pruned_counts = Counter({key: count for key, count in keys.items() if count > 1})
-    #     # print(pruned_counts.total())
-    #     pruned_counts = keys
-    #     # keys, counts = zip(*pruned_counts.most_common())
-    #
-    #     # Create bar chart
-    #     plt.bar(keys, counts)
-    #     plt.xlabel("keys")
-    #     plt.ylabel("Count")
-    #     plt.title("Key Frequency Histogram")
-    #     plt.savefig("../workload-similarity-count.png")
-
-    # plot_bar(tec_key)
+    os.makedirs("../plots", exist_ok=True)
+    out = "../plots/iostat_combined.pdf"
+    fig.savefig(out, bbox_inches='tight', pad_inches=0.03)
+    print(f"Saved: {out}")
 
 if __name__ == "__main__":
     main()

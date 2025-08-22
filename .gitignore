@@ -8,3 +8,11 @@ cmake-build-release-with-stats
 db/
 
 *.png
+
+*.pdf
+
+.DS_Store
+*.pyc
+
+
+
