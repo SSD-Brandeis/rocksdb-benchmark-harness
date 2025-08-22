@@ -201,9 +201,10 @@ def main():
     bar_two_systems("Write amplification", write_amp, "amplification (x)", "stats_write_amplification.pdf", as_mib=False)
 
     # 3) Actual bytes read (avg)
+ 
     bytes_read = {
-        "ycsb": float(m_y.get("rocksdb.bytes.read", 0)),
-        "tectonic": float(m_t.get("rocksdb.bytes.read", 0)),
+        "ycsb": float(m_y.get("rocksdb.bytes.read", 0) + m_y.get("rocksdb.compact.read.bytes", 0)),
+        "tectonic": float(m_t.get("rocksdb.bytes.read", 0) + m_t.get("rocksdb.compact.read.bytes", 0)),
     }
     bar_two_systems("Actual bytes read", bytes_read, "MiB", "stats_bytes_read.pdf", as_mib=True)
    
