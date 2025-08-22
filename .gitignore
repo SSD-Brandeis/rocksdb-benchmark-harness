@@ -9,7 +9,6 @@ db/
 
 *.png
 
-*.pdf
 
 .DS_Store
 *.pyc
