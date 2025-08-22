@@ -21,10 +21,6 @@ function generate_tectonic_workload() {
     -o "${EXPERIMENT_PATH}/tec-workload-a.txt"
 }
 
-generate_tectonic_workload
-
-exit
-
 function generate_ycsb_workload() {
   echo "generating ycsb workload"
   cd vendor/YCSB

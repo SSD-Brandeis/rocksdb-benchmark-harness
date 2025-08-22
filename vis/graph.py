@@ -116,7 +116,7 @@ def _(np, plt, stats):
 
 
 @app.cell
-def _(Counter, float_info, tqdm):
+def _(Counter, float_info, np, tqdm):
     from enum import StrEnum
 
     class OpChar(StrEnum):
@@ -137,6 +137,24 @@ def _(Counter, float_info, tqdm):
             size /= 1024.0
         return f"{size:.2f} PB"
 
+    def array_stats(arr: list[int]) -> dict:
+        arr = np.asarray(arr)  # ensure it's a numpy array
+    
+        percentiles = np.percentile(arr, [25, 50, 75, 95, 99])
+    
+        return {
+            "min": np.min(arr),
+            "p25": percentiles[0],
+            "p50": percentiles[1],  # median
+            "p75": percentiles[2],
+            "p95": percentiles[3],
+            "p99": percentiles[4],
+            "max": np.max(arr),
+            "mean": np.mean(arr),
+            "std": np.std(arr, ddof=1),  # sample std dev
+        }
+
+
     def count_workload(filename: str):
         with open(filename) as f:
             lines = f.readlines()
@@ -153,6 +171,8 @@ def _(Counter, float_info, tqdm):
         point_query_bytes = 0
         empty_point_query_count = 0
 
+        pq_val_len = []
+
         for line in tqdm(lines):
             line = line.strip()
             if line.startswith(OpChar.INSERT):
@@ -168,6 +188,7 @@ def _(Counter, float_info, tqdm):
             elif line.startswith(OpChar.QUERY_POINT):
                 _, key = line.split(" ", maxsplit=1)
                 val = db.get(key)
+                pq_val_len.append(len(val))
                 point_query_counter[key] += 1
                 idx = key_to_idx[key]
                 point_query_idx.append(max(idx / len(keys), float_info.epsilon))
@@ -178,6 +199,7 @@ def _(Counter, float_info, tqdm):
 
         print(f"{empty_point_query_count=}")
         print(f"{bytes_to_human(point_query_bytes)} ({point_query_bytes} B)")
+        print(array_stats(pq_val_len))
 
         return keys, ((update_counter, update_idx), (point_query_counter, point_query_idx))
     return (count_workload,)
