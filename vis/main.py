@@ -13,9 +13,9 @@ from statsmodels.genmod.generalized_linear_model import GLM
 from statsmodels.othermod.betareg import BetaModel
 
 def main():
-    # workload_similarity_iostat()
+    workload_similarity_iostat()
     # workload_similarity_op_latency()
-    workload_similarity_counting()
+    # workload_similarity_counting()
 
 
 def workload_similarity_op_latency():
@@ -51,7 +51,7 @@ def workload_similarity_iostat():
     ]
     datas_ycsb = [
         load_data(path)
-        for path in glob("../experiments/workload-similarity/iostat.yscb.*.json")
+        for path in glob("../experiments/workload-similarity/iostat.ycsb.*.json")
     ]
 
 

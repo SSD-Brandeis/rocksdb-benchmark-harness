@@ -8,4 +8,5 @@ dependencies = [
     "marimo>=0.14.17",
     "matplotlib>=3.10.5",
     "statsmodels>=0.14.5",
+    "tqdm>=4.67.1",
 ]

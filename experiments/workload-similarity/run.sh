@@ -21,6 +21,10 @@ function generate_tectonic_workload() {
     -o "${EXPERIMENT_PATH}/tec-workload-a.txt"
 }
 
+generate_tectonic_workload
+
+exit
+
 function generate_ycsb_workload() {
   echo "generating ycsb workload"
   cd vendor/YCSB
@@ -46,10 +50,6 @@ function generate_ycsb_workload() {
   rm "${EXPERIMENT_PATH}/ycsb-workload.1.part" "${EXPERIMENT_PATH}/ycsb-workload.2.part"
   cd ../..
 }
-
-./cmake-build-release/rocksdb-benchmark-harness \
- ./experiments/workload-similarity/rocksdb-options.ini \
- ./experiments/workload-similarity/tec-workload-a.txt >"${EXPERIMENT_PATH}/ops.json"
 
 for i in $(seq 1 "$RUNS"); do
   echo "tectonic iostat run $i"
