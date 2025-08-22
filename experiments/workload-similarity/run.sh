@@ -21,6 +21,7 @@ function generate_tectonic_workload() {
     -o "${EXPERIMENT_PATH}/tec-workload-a.txt"
 }
 
+
 function generate_ycsb_workload() {
   echo "generating ycsb workload"
   cd vendor/YCSB
@@ -46,6 +47,11 @@ function generate_ycsb_workload() {
   rm "${EXPERIMENT_PATH}/ycsb-workload.1.part" "${EXPERIMENT_PATH}/ycsb-workload.2.part"
   cd ../..
 }
+
+generate_tectonic_workload
+generate_ycsb_workload
+
+exit
 
 for i in $(seq 1 "$RUNS"); do
   echo "tectonic iostat run $i"

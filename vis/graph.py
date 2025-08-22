@@ -198,7 +198,7 @@ def _(Counter, float_info, np, tqdm):
                     empty_point_query_count += 1
 
         print(f"{empty_point_query_count=}")
-        print(f"{bytes_to_human(point_query_bytes)} ({point_query_bytes} B)")
+        print(f"pq bytes read {bytes_to_human(point_query_bytes)} ({point_query_bytes} B)")
         print(array_stats(pq_val_len))
 
         return keys, ((update_counter, update_idx), (point_query_counter, point_query_idx))
