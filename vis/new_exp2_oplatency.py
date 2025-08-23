@@ -104,14 +104,14 @@ def plot_system():
     # Axis labels
     ax.set_xticks(positions)
     ax.set_xticklabels(labels)
-    ax.set_xlabel("operation type")
+    # ax.set_xlabel("operation type")
     ax.set_ylim(0)
     # latex version of micro seconds
     ax.set_ylabel("latency ($\\mu$s)")
 
     # # Legend (use the boxes directly as handles)
     # handles, labels = ax.get_legend_handles_labels()
-    legend_fig = plt.figure(figsize=(3, 1.2))
+    legend_fig = plt.figure(figsize=(2.5, 1.2))
     legend_fig.legend([bp1["boxes"][0], bp2["boxes"][0]], ["YCSB", "Tectonic"], loc="center", ncol=2, frameon=False,  borderaxespad=0, labelspacing=0, borderpad=0, columnspacing=1.0)
     legend_fig.savefig('../plots/legend2.pdf', bbox_inches='tight', pad_inches=0.015)
 
