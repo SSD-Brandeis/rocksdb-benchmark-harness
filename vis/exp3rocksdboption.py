@@ -16,6 +16,8 @@ convert_to_gib = 1024.0 * 1024.0 * 1024.0  # bytes → GiB
 prop = font_manager.FontProperties(
     fname="../LinLibertine_Mah.ttf"
 )
+
+
 plt.rcParams['font.family'] = prop.get_name()
 plt.rcParams['text.usetex'] = True
 plt.rcParams['font.weight'] = 'normal'
@@ -241,6 +243,7 @@ def main():
     ax.set_ylabel("bytes (GB)")
     ax.set_xlabel("operation")
     # ax.legend()
+    ax.set_xlim(-0.3, 0.3)
 
     fig.savefig("../plots/read_write.pdf", bbox_inches='tight', pad_inches=0.03)
 
@@ -265,27 +268,35 @@ def main():
     grouped_two_bars_per_system("Event counts: compaction vs flush", comp_flush_pairs,
                                 "count", "stats_compact_flush_counts.pdf", as_mib=False, names=("compaction","flush"))
 
-    # 7) Block cache: miss / hit / add 
-    cache_triples = {
-        "ycsb": (float(m_y.get("rocksdb.block.cache.miss", 0)),
-                 float(m_y.get("rocksdb.block.cache.hit", 0)),
-                 float(m_y.get("rocksdb.block.cache.add", 0))),
-        "tectonic": (float(m_t.get("rocksdb.block.cache.miss", 0)),
-                     float(m_t.get("rocksdb.block.cache.hit", 0)),
-                     float(m_t.get("rocksdb.block.cache.add", 0))),
+    # 7) Block cache: cache miss / cache hit
+    cache_pairs = {
+    "ycsb": (
+        float(m_y.get("rocksdb.block.cache.miss", 0)),
+        float(m_y.get("rocksdb.block.cache.hit", 0)),
+    ),
+    "tectonic": (
+        float(m_t.get("rocksdb.block.cache.miss", 0)),
+        float(m_t.get("rocksdb.block.cache.hit", 0)),
+    ),
     }
-    # triple_group("Block cache: miss / hit / add", cache_triples, "count", "stats_block_cache.pdf",
-    #              bar_names=["miss", "hit", "add"])
 
     convert_to_million = 1_000_000
 
-    categories = ["hit", "miss", "add"]
-    ycsb_vals = [cache_triples["ycsb"][1]/convert_to_million, cache_triples["ycsb"][0]/convert_to_million, cache_triples["ycsb"][2]/convert_to_million]
-    tectonic_vals = [cache_triples["tectonic"][1]/convert_to_million, cache_triples["tectonic"][0]/convert_to_million, cache_triples["tectonic"][2]/convert_to_million]
+    categories = [ "cache\nhit", "cache\nmiss"]
+    ycsb_vals = [
+        cache_pairs["ycsb"][1] / convert_to_million,
+        cache_pairs["ycsb"][0] / convert_to_million,
+    ]
+    tectonic_vals = [
+        cache_pairs["tectonic"][1] / convert_to_million,
+        cache_pairs["tectonic"][0] / convert_to_million,
+    ]
 
-    x = np.arange(len(categories))  # positions for categories
-    width = 0.25  # width of each bar
-    fig, ax = plt.subplots(figsize=(3.5, 3.5), dpi=150)
+
+    x = np.arange(len(categories)) 
+    # x = np.array([0, 0.8])  
+    width = 0.25 
+    fig, ax = plt.subplots(figsize=(2.8, 3.5), dpi=150)
 
     # Bars
     ax.bar(x - width/2, ycsb_vals, width, **bar_styles["YCSB"])
@@ -295,9 +306,14 @@ def main():
     ax.set_xticks(x)
     ax.set_xticklabels(categories)
     ax.set_ylabel("count (millions)")
-    ax.set_xlabel("cache")
-    ax.set_yticklabels([0] + [f"{tick}" for tick in ax.get_yticks()[1:]])  # remove decimal places
-    # ax.legend()
+    # ax.set_xlabel("cache")
+    # ax.set_xlim(-0.5, 1) 
+    
+    ax.set_yticklabels([0] + [f"{tick}" for tick in ax.get_yticks()[1:]])
+
+
+    ax.set_xlim(-0.5, len(categories)-0.5)
+
 
     fig.savefig("../plots/block_cache.pdf", bbox_inches='tight', pad_inches=0.03)
 
