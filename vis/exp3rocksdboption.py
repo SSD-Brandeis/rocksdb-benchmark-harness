@@ -11,15 +11,17 @@ from glob import glob
 
 from style import bar_styles, bar_hatches
 
+convert_to_gib = 1024.0 * 1024.0 * 1024.0  # bytes → GiB
+
 prop = font_manager.FontProperties(
-    fname="/Users/cba/Desktop/tectonic/LinLibertine_Mah.ttf"
+    fname="../LinLibertine_Mah.ttf"
 )
 plt.rcParams['font.family'] = prop.get_name()
 plt.rcParams['text.usetex'] = True
 plt.rcParams['font.weight'] = 'normal'
-plt.rcParams['font.size'] = 22
+plt.rcParams['font.size'] = 20
 
-BASE = "/Users/cba/Desktop/rocksdb-benchmark-harness/experiments/workload-similarity"
+BASE = "../experiments/workload-similarity"
 PLOTS_DIR = "../plots"
 MiB = 1024.0 * 1024.0
 
@@ -187,18 +189,18 @@ def main():
         "ycsb": float(m_y.get("rocksdb.wal.bytes",0 )+m_y.get("rocksdb.flush.write.bytes",0 )+m_y.get("rocksdb.compact.write.bytes",0 )),
         "tectonic": float(m_t.get("rocksdb.wal.bytes",0 )+m_t.get("rocksdb.flush.write.bytes",0 )+m_t.get("rocksdb.compact.write.bytes",0 )),
     }
-    bar_two_systems("Actual bytes written", bytes_written, "MiB", "stats_bytes_written.pdf", as_mib=True)
-    print (bytes_written)
+    # bar_two_systems("Actual bytes written", bytes_written, "MiB", "stats_bytes_written.pdf", as_mib=True)
+    # print (bytes_written)
 
     # 2) Write amplification = actual_written / (num_inserts * entry_size)
     num_inserts = {
         "ycsb": float(m_y.get("rocksdb.number.keys.written", 0)),
         "tectonic": float(m_t.get("rocksdb.number.keys.written", 0)),
     }
-    logical_written = {k: num_inserts[k] * entry_size for k in num_inserts}
-    print (logical_written)
-    write_amp = {k: (bytes_written[k] / logical_written[k]) if logical_written[k] > 0 else 0.0 for k in bytes_written}
-    bar_two_systems("Write amplification", write_amp, "amplification (x)", "stats_write_amplification.pdf", as_mib=False)
+    # logical_written = {k: num_inserts[k] * entry_size for k in num_inserts}
+    # print (logical_written)
+    # write_amp = {k: (bytes_written[k] / logical_written[k]) if logical_written[k] > 0 else 0.0 for k in bytes_written}
+    # bar_two_systems("Write amplification", write_amp, "amplification (x)", "stats_write_amplification.pdf", as_mib=False)
 
     # 3) Actual bytes read (avg)
  
@@ -206,16 +208,8 @@ def main():
         "ycsb": float(m_y.get("rocksdb.bytes.read", 0) + m_y.get("rocksdb.compact.read.bytes", 0)),
         "tectonic": float(m_t.get("rocksdb.bytes.read", 0) + m_t.get("rocksdb.compact.read.bytes", 0)),
     }
-    bar_two_systems("Actual bytes read", bytes_read, "MiB", "stats_bytes_read.pdf", as_mib=True)
-   
-    # 4) Read amplification = actual_read / (num_point_queries * entry_size)
-    num_reads = {
-        "ycsb": float(m_y.get("rocksdb.number.keys.read", 0)),
-        "tectonic": float(m_t.get("rocksdb.number.keys.read", 0)),
-    }
-    logical_read = {k: num_reads[k] * entry_size for k in num_reads}
-    read_amp = {k: (bytes_read[k] / logical_read[k]) if logical_read[k] > 0 else 0.0 for k in bytes_read}
-    bar_two_systems("Read amplification", read_amp, "amplification (×)", "stats_read_amplification.pdf", as_mib=False)
+    # bar_two_systems("Actual bytes read", bytes_read, "MiB", "stats_bytes_read.pdf", as_mib=True)
+
 
     # 5) Compaction read/write bytes (grouped 2 bars per system)
     comp_pairs = {
@@ -224,7 +218,42 @@ def main():
         "tectonic": (float(m_t.get("rocksdb.compact.read.bytes", 0)),
                      float(m_t.get("rocksdb.compact.write.bytes", 0))),
     }
-    grouped_two_bars_per_system("Compaction bytes", comp_pairs, "MiB", "stats_compaction_bytes.pdf", as_mib=True, names=("read","write"))
+    # grouped_two_bars_per_system("Compaction bytes", comp_pairs, "MiB", "stats_compaction_bytes.pdf", as_mib=True, names=("read","write"))
+
+
+    # Prepare data
+    categories = ["read", "write"]
+    ycsb_vals = [bytes_read["ycsb"] / convert_to_gib, bytes_written["ycsb"] / convert_to_gib]
+    tectonic_vals = [bytes_read["tectonic"] / convert_to_gib, bytes_written["tectonic"] / convert_to_gib]
+
+    x = np.arange(len(categories))  # positions for categories
+    width = 0.25  # width of each bar
+
+    fig, ax = plt.subplots(figsize=(2.5, 3.5), dpi=150)
+
+    # Bars
+    ax.bar(x - width/2, ycsb_vals, width, **bar_styles["YCSB"])
+    ax.bar(x + width/2, tectonic_vals, width, **bar_styles["Tectonic"])
+
+    # Labels & formatting
+    ax.set_xticks(x)
+    ax.set_xticklabels(categories)
+    ax.set_ylabel("bytes (GB)")
+    ax.set_xlabel("operation")
+    # ax.legend()
+
+    fig.savefig("../plots/read_write.pdf", bbox_inches='tight', pad_inches=0.03)
+
+
+
+    # 4) Read amplification = actual_read / (num_point_queries * entry_size)
+    num_reads = {
+        "ycsb": float(m_y.get("rocksdb.number.keys.read", 0)),
+        "tectonic": float(m_t.get("rocksdb.number.keys.read", 0)),
+    }
+    logical_read = {k: num_reads[k] * entry_size for k in num_reads}
+    read_amp = {k: (bytes_read[k] / logical_read[k]) if logical_read[k] > 0 else 0.0 for k in bytes_read}
+    bar_two_systems("Read amplification", read_amp, "amplification (×)", "stats_read_amplification.pdf", as_mib=False)
 
     # 6) Compaction vs Flush counts 
     comp_flush_pairs = {
@@ -245,8 +274,33 @@ def main():
                      float(m_t.get("rocksdb.block.cache.hit", 0)),
                      float(m_t.get("rocksdb.block.cache.add", 0))),
     }
-    triple_group("Block cache: miss / hit / add", cache_triples, "count", "stats_block_cache.pdf",
-                 bar_names=["miss", "hit", "add"])
+    # triple_group("Block cache: miss / hit / add", cache_triples, "count", "stats_block_cache.pdf",
+    #              bar_names=["miss", "hit", "add"])
+
+    convert_to_million = 1_000_000
+
+    categories = ["hit", "miss", "add"]
+    ycsb_vals = [cache_triples["ycsb"][1]/convert_to_million, cache_triples["ycsb"][0]/convert_to_million, cache_triples["ycsb"][2]/convert_to_million]
+    tectonic_vals = [cache_triples["tectonic"][1]/convert_to_million, cache_triples["tectonic"][0]/convert_to_million, cache_triples["tectonic"][2]/convert_to_million]
+
+    x = np.arange(len(categories))  # positions for categories
+    width = 0.25  # width of each bar
+    fig, ax = plt.subplots(figsize=(3.5, 3.5), dpi=150)
+
+    # Bars
+    ax.bar(x - width/2, ycsb_vals, width, **bar_styles["YCSB"])
+    ax.bar(x + width/2, tectonic_vals, width, **bar_styles["Tectonic"])
+
+    # Labels & formatting
+    ax.set_xticks(x)
+    ax.set_xticklabels(categories)
+    ax.set_ylabel("count (millions)")
+    ax.set_xlabel("cache")
+    ax.set_yticklabels([0] + [f"{tick}" for tick in ax.get_yticks()[1:]])  # remove decimal places
+    # ax.legend()
+
+    fig.savefig("../plots/block_cache.pdf", bbox_inches='tight', pad_inches=0.03)
+
 
     # 8) SST level hits: L0 / L1 / L2+ 
     level_triples = {
