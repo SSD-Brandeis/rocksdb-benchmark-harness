@@ -160,7 +160,7 @@ def _(Counter, StrEnum, float_info, np, tqdm):
                 insert_val_len.append(len(val))
 
             elif line.startswith(OpChar.UPDATE):
-                _, key, value = line.split(" ", maxsplit=2)
+                _, key, val = line.split(" ", maxsplit=2)
                 db[key] = val
 
                 idx = key_to_idx[key]
