@@ -3,7 +3,7 @@
 set -e
 
 RUNS=5
-EXPERIMENT_PATH=$(realpath "${EXPERIMENT_PATH}/10x/")
+EXPERIMENT_PATH=$(realpath "./experiments/workload-similarity/10x/")
 
 echo "Building tectonic"
 cd vendor/tectonic
