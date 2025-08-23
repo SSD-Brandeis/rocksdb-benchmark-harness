@@ -77,9 +77,8 @@ for i in $(seq 1 "$RUNS"); do
 done
 
 for i in $(seq 1 "$RUNS"); do
-  echo "generating workloads for run $i"
+  echo "generating tec workloads for run $i"
   generate_tectonic_workload
-  generate_ycsb_workload
 
   echo "tectonic stats run $i"
   sudo sysctl -w vm.drop_caches=3
@@ -91,6 +90,11 @@ for i in $(seq 1 "$RUNS"); do
    "${EXPERIMENT_PATH}/op-latency.tectonic.$i.json"
 
 
+  rm "${EXPERIMENT_PATH}/tec-workload-a.txt"
+
+  echo "generating tec workloads for run $i"
+  generate_ycsb_workload
+
   echo "YCSB stats run $i"
   sudo sysctl -w vm.drop_caches=3
 
@@ -99,5 +103,7 @@ for i in $(seq 1 "$RUNS"); do
    "${EXPERIMENT_PATH}/ycsb-workload-a.txt" \
    "${EXPERIMENT_PATH}/stats.ycsb.$i.json" \
    "${EXPERIMENT_PATH}/op-latency.ycsb.$i.json"
+
+  rm "${EXPERIMENT_PATH}/ycsb-workload-a.txt"
 
 done
