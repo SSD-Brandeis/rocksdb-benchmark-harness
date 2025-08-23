@@ -33,7 +33,7 @@
           "updates": {
             "op_count": 500000,
             "val": {
-              "uniform": { "len": 128 }
+              "uniform": { "len": 1090 }
             },
             "selection": {
               "beta": {
