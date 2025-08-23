@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "marimo>=0.14.17",
+    "marimo>=0.15.0",
     "matplotlib>=3.10.5",
     "statsmodels>=0.14.5",
     "tqdm>=4.67.1",

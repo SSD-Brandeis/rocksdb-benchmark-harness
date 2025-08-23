@@ -48,11 +48,6 @@ function generate_ycsb_workload() {
   cd ../..
 }
 
-generate_tectonic_workload
-generate_ycsb_workload
-
-exit
-
 for i in $(seq 1 "$RUNS"); do
   echo "tectonic iostat run $i"
   generate_tectonic_workload
