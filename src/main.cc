@@ -183,6 +183,10 @@ namespace stats {
   if (!s.ok())
     FAIL("couldn't destroy db", s);
 #ifdef STATS
+  std::sort(latency_insert.begin(), latency_insert.end());
+  std::sort(latency_update.begin(), latency_update.end());
+  std::sort(latency_point_query.begin(), latency_point_query.end());
+
   stats::dump_latency(latency_file, latency_insert, "insert (ns)");
   stats::dump_latency(latency_file, latency_update, "update (ns)");
   stats::dump_latency(latency_file, latency_point_query, "point query (ns)");
