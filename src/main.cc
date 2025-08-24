@@ -58,38 +58,31 @@ std::tuple<rocksdb::Status, rocksdb::Options, rocksdb::ReadOptions, rocksdb::Wri
   } while (0)
 
 namespace stats {
-  enum Operation {
-    Insert,
-    Update,
-    Merge,
-    PointDelete,
-    RangeDelete,
-    PointQuery,
-    RangeQuery,
-  };
+  double percentile(const std::vector<uint64_t> &data, double percentile) {
+    if (data.empty()) return 0.0;
+    if (percentile < 0.0 || percentile > 100.0) throw std::out_of_range("percentile out of range");
 
-  NLOHMANN_JSON_SERIALIZE_ENUM(Operation, {
-                               {Insert, "Insert"},
-                               {Update, "Update"},
-                               {Merge, "Merge"},
-                               {PointDelete, "PointDelete"},
-                               {RangeDelete, "RangeDelete"},
-                               {PointQuery, "PointQuery"},
-                               {RangeQuery, "RangeQuery"},
-                               })
+    const size_t len = data.size();
+    const double pos = (percentile / 100.0) * static_cast<double>(len - 1); // fractional index
+    const auto idx = static_cast<size_t>(pos);
+    const double frac = pos - static_cast<double>(idx);
 
-
-  class OperationTiming {
-  public:
-    Operation operation;
-    long latency;
-
-    OperationTiming(const Operation operation, const long latency) : operation(operation),
-                                                                     latency(latency) {
+    const auto v1 = static_cast<double>(data[idx]);
+    if (idx + 1 < len) {
+      const auto v2 = static_cast<double>(data[idx + 1]);
+      return (v1 * (1.0 - frac)) + (v2 * frac); // linear interpolation
     }
+    return v1;
+  }
 
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(OperationTiming, operation, latency);
-  };
+  void dump_latency(std::ofstream &file, const std::vector<uint64_t> &data, const std::string &operation) {
+    file << operation << std::endl;
+    file << "p0," << percentile(data, 0) << std::endl;
+    file << "p25," << percentile(data, 25) << std::endl;
+    file << "p50," << percentile(data, 50) << std::endl;
+    file << "p75," << percentile(data, 75) << std::endl;
+    file << "p95," << percentile(data, 95) << std::endl;
+  }
 }
 
 [[nodiscard]] rocksdb::Status benchmark(
@@ -122,7 +115,9 @@ namespace stats {
     FAIL("couldn't open db", s);
 
 #ifdef STATS
-  std::vector<stats::OperationTiming> timings;
+  std::vector<uint64_t> latency_insert;
+  std::vector<uint64_t> latency_update;
+  std::vector<uint64_t> latency_point_query;
 #endif
   std::string line;
   while (std::getline(workload_file, line)) {
@@ -141,7 +136,7 @@ namespace stats {
       s = db->Put(write_opts, key, value);
 #ifdef STATS
       auto latency = std::chrono::duration_cast<ns>(hrc::now() - start);
-      timings.emplace_back(stats::Insert, latency.count());
+      latency_insert.push_back(latency.count());
 #endif
       if (!s.ok()) fmt::println(stderr, "Error inserting {}", s.ToString());
     } else if (operation == "P") {
@@ -152,7 +147,7 @@ namespace stats {
       s = db->Get(read_opts, rest, &value);
 #ifdef STATS
       auto latency = std::chrono::duration_cast<ns>(hrc::now() - start);
-      timings.emplace_back(stats::PointQuery, latency.count());
+      latency_point_query.push_back(latency.count());
 #endif
       if (!s.ok() && !s.IsNotFound()) fmt::println(stderr, "Error point querying {}", s.ToString());
     } else if (operation == "U") {
@@ -165,7 +160,7 @@ namespace stats {
       s = db->Put(write_opts, key, value);
 #ifdef STATS
       auto latency = std::chrono::duration_cast<ns>(hrc::now() - start);
-      timings.emplace_back(stats::Update, latency.count());
+      latency_update.push_back(latency.count());
 #endif
       if (!s.ok()) {
         fmt::println(stderr, "Error updating {}", s.ToString());
@@ -188,8 +183,9 @@ namespace stats {
   if (!s.ok())
     FAIL("couldn't destroy db", s);
 #ifdef STATS
-  json timings_json = timings;
-  latency_file << timings_json.dump();
+  stats::dump_latency(latency_file, latency_insert, "insert (ns)");
+  stats::dump_latency(latency_file, latency_update, "update (ns)");
+  stats::dump_latency(latency_file, latency_point_query, "point query (ns)");
 #endif
 
   return rocksdb::Status::OK();
