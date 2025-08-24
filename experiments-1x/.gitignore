@@ -1,0 +1,6 @@
+*.json
+!*.spec.json
+
+*.txt
+
+multi/
