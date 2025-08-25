@@ -12,11 +12,11 @@ from style import line_styles
 # Use non-interactive backend
 matplotlib.use("Agg")
 
-TAG = "-10x"
+TAG = "100x"
 
 # Constants
-BASE_DIR = Path(f"../experiments{TAG}/workload-similarity")
-BYTE_TO_MB = 1024 * 1024
+BASE_DIR = Path(f"../experiments/workload-similarity/{TAG}")
+BYTE_TO_GB = 1024 * 1024 * 1024
 KB_TO_BYTES = 1024
 
 # Font setup
@@ -33,11 +33,11 @@ def load_iostat(path):
     stats = data["sysstat"]["hosts"][0]["statistics"]
 
     reads = [
-        float(s.get("disk", [{}])[0].get("kB_read/s", 0.0)) * KB_TO_BYTES / BYTE_TO_MB
+        float(s.get("disk", [{}])[0].get("kB_read/s", 0.0)) * KB_TO_BYTES / BYTE_TO_GB
         for s in stats
     ]
     writes = [
-        float(s.get("disk", [{}])[0].get("kB_wrtn/s", 0.0)) * KB_TO_BYTES / BYTE_TO_MB
+        float(s.get("disk", [{}])[0].get("kB_wrtn/s", 0.0)) * KB_TO_BYTES / BYTE_TO_GB
         for s in stats
     ]
     return np.array(reads), np.array(writes)
@@ -62,40 +62,33 @@ def plot_iostat(runs_tec, runs_ycsb, plot_file, legend_file):
     r_tec, w_tec = average_runs(runs_tec)
     r_ycsb, w_ycsb = average_runs(runs_ycsb)
     n = min(len(r_tec), len(w_tec), len(r_ycsb), len(w_ycsb))
-    step = 10
-    x = np.arange(n) + 1  # Start x-axis from 1
+    step = 200
+
+    x = np.arange(n) + 1
     x = x[::step]
-    r_tec, w_tec = r_tec[::step], w_tec[::step]
-    r_ycsb, w_ycsb = r_ycsb[::step], w_ycsb[::step]
+    r_tec, w_tec = r_tec[:n:step], w_tec[:n:step]
+    r_ycsb, w_ycsb = r_ycsb[:n:step], w_ycsb[:n:step]
+
+    min_len = min(len(x), len(r_tec), len(w_tec), len(r_ycsb), len(w_ycsb))
+    x, r_tec, w_tec, r_ycsb, w_ycsb = (
+        x[:min_len],
+        r_tec[:min_len],
+        w_tec[:min_len],
+        r_ycsb[:min_len],
+        w_ycsb[:min_len],
+    )
 
     fig, ax = plt.subplots(figsize=(5, 3.5))
 
-    # Plot lines
-    ax.plot(
-        x,
-        r_ycsb[:n],
-        **{**line_styles["YCSB"], "linestyle": "-", "label": "read (YCSB)"},
-    )
-    ax.plot(
-        x,
-        w_ycsb[:n],
-        **{**line_styles["YCSB"], "linestyle": "--", "label": "write (YCSB)"},
-    )
-    ax.plot(
-        x,
-        r_tec[:n],
-        **{**line_styles["Tectonic"], "linestyle": "-", "label": "read (Tectonic)"},
-    )
-    ax.plot(
-        x,
-        w_tec[:n],
-        **{**line_styles["Tectonic"], "linestyle": "--", "label": "write (Tectonic)"},
-    )
+    ax.plot(x, r_ycsb, **{**line_styles["YCSB"], "linestyle": "-", "label": "read (YCSB)"})
+    ax.plot(x, w_ycsb, **{**line_styles["YCSB"], "linestyle": "--", "label": "write (YCSB)"})
+    ax.plot(x, r_tec, **{**line_styles["Tectonic"], "linestyle": "-", "label": "read (Tectonic)"})
+    ax.plot(x, w_tec, **{**line_styles["Tectonic"], "linestyle": "--", "label": "write (Tectonic)"})
 
     ax.set_xlabel("time (s)")
-    ax.set_ylabel("MB/s")
-    ax.set_ylim(0, 300)
-    # ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    ax.set_ylabel("GB/s")
+    ax.set_ylim(0)
+    ax.set_yticklabels([0] + [f"{tick:.1f}" for tick in ax.get_yticks()[1:]])
 
     fig.savefig(plot_file, bbox_inches="tight", pad_inches=0.03)
 
@@ -103,16 +96,9 @@ def plot_iostat(runs_tec, runs_ycsb, plot_file, legend_file):
     handles, labels = ax.get_legend_handles_labels()
     legend_fig = plt.figure(figsize=(4, 1))
     legend_fig.legend(
-        handles[-4:],
-        labels[-4:],
-        loc="center",
-        ncol=4,
-        frameon=False,
-        borderaxespad=0,
-        labelspacing=0,
-        borderpad=0,
-        columnspacing=0.5,
-        handletextpad=0.3,
+        handles[-4:], labels[-4:], loc="center", ncol=4,
+        frameon=False, borderaxespad=0, labelspacing=0,
+        borderpad=0, columnspacing=0.5, handletextpad=0.3,
     )
     legend_fig.savefig(legend_file, bbox_inches="tight", pad_inches=0.015)
 

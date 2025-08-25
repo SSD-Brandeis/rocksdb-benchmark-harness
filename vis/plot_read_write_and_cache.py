@@ -11,13 +11,13 @@ from style import bar_styles
 # Use non-interactive backend
 matplotlib.use("Agg")
 
-TAG = "-10x"
+TAG = "100x"
 
 # Constants
-BASE_DIR = Path(f"../experiments{TAG}/workload-similarity")
+BASE_DIR = Path(f"../experiments/workload-similarity/{TAG}")
 PLOTS_DIR = Path("../plots")
 PLOTS_DIR.mkdir(exist_ok=True)
-CONVERT_TO_GIB = 1024**3  # bytes → GiB
+CONVERT_TO_TIB = 1024**4  # bytes → TiB
 CONVERT_TO_MILLION = 1_000_000
 
 # Font setup
@@ -75,7 +75,7 @@ def plot_read_write(m_y, m_t):
         + m_y.get("rocksdb.flush.write.bytes", 0)
         + m_y.get("rocksdb.compact.write.bytes", 0)
     )
-    ycsb_vals = np.array([bytes_read, bytes_written]) / CONVERT_TO_GIB
+    ycsb_vals = np.array([bytes_read, bytes_written]) / CONVERT_TO_TIB
 
     bytes_read_t = m_t.get("rocksdb.bytes.read", 0) + m_t.get(
         "rocksdb.compact.read.bytes", 0
@@ -85,7 +85,7 @@ def plot_read_write(m_y, m_t):
         + m_t.get("rocksdb.flush.write.bytes", 0)
         + m_t.get("rocksdb.compact.write.bytes", 0)
     )
-    tectonic_vals = np.array([bytes_read_t, bytes_written_t]) / CONVERT_TO_GIB
+    tectonic_vals = np.array([bytes_read_t, bytes_written_t]) / CONVERT_TO_TIB
 
     categories = ["read", "write"]
     x = np.arange(len(categories))
@@ -97,7 +97,8 @@ def plot_read_write(m_y, m_t):
 
     ax.set_xticks(x)
     ax.set_xticklabels(categories)
-    ax.set_ylabel("bytes (GB)")
+    ax.set_ylabel("bytes (TB)")
+    ax.set_yticklabels([0] + [f"{tick}" for tick in ax.get_yticks()[1:]])
     fig.savefig(PLOTS_DIR / "read_write.pdf", bbox_inches="tight", pad_inches=0.03)
     plt.close(fig)
     print(f"Saved: {PLOTS_DIR / 'read_write.pdf'}")

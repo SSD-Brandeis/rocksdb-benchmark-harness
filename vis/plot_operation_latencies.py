@@ -10,10 +10,10 @@ import numpy as np
 # Use non-interactive backend
 matplotlib.use("Agg")
 
-TAG = "-10x"
+TAG = "100x"
 
 # Constants
-BASE_DIR = Path(f"../experiments{TAG}/workload-similarity")
+BASE_DIR = Path(f"../experiments/workload-similarity/{TAG}")
 OUTPUT_DIR = Path("../plots")
 OUTPUT_DIR.mkdir(exist_ok=True)
 CONVERT_TO_MS = 1000.0  # nanoseconds → microseconds
@@ -93,11 +93,13 @@ def plot_latency_boxplot():
         for item in bp_tec[element]:
             item.set_color("black")
 
+    ax.set_yscale("log")
+    ax.set_ylim(1e0)
     # Axis labels
     ax.set_xticks(positions)
     ax.set_xticklabels(labels)
     ax.set_ylabel("latency ($\\mu$s)")
-    ax.set_ylim(0)
+    # ax.set_ylim(0)
 
     # Save main plot
     output_file = OUTPUT_DIR / "op_latency_box.pdf"
